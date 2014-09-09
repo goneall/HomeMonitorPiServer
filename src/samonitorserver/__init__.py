@@ -1,7 +1,16 @@
+'''
+Main server script - continuously polls for alarm signals on the 
+Raspberry PI GPIO and sends a message to the Android app through
+Google GCM.
+
+Parameters: GCMServerKey (required), IP Address of relay server (optional), Port number of relay server (optional)
+'''
+
 import shelve, time, sys, urllib2, logging
 import gcmclient
 
-use_relay = True
+class RelayServerException(Exception): pass
+
 extra_home_monitor_url = "com.sourceauditor.sahomemonitor.homemonitorurl"
 extra_home_monitor_audio_url = "com.sourceauditor.sahomemonitor.homemonitoraudiourl"
 extra_message_from_home = "com.sourceauditor.sahomemonitor.messagefromhome"
@@ -24,12 +33,19 @@ public_ip_update_time = 1.0      # last time the public IP was updated
 time_to_refresh_public_ip = 1000 # number of seconds to wait before updating the public IP address
 
 logging.basicConfig(filename=log_file_name,level=logging.INFO)
+
+use_relay = False
 saServerGcm = None
 relayClient = None
 relay_ip_address = '10.0.0.7'
 relay_port = 13373
 
 server_key = sys.argv[1]
+if len(sys.argv) > 2:
+    use_relay = True
+    relay_ip_address = sys.argv[2]
+if len(sys.argv) > 3:
+    relay_port = sys.argv[3]
 if use_relay:
     import gcmrelay.relayclient
     relayClient = gcmrelay.relayclient.GcmRelayClient(relay_ip_address, relay_port, server_key)
@@ -71,6 +87,8 @@ def sendMessageToAndroid(msg):
         response = relayClient.send(registration_ids=reg_ids, data=data)
     else:
         response = saServerGcm.json_request(registration_ids=reg_ids, data=data)
+    if 'exception' in response:
+        raise RelayServerException(response['exception'])
     if 'errors' in response:
         for error, reg_ids in response['errors'].items():
             # Check for errors and act accordingly

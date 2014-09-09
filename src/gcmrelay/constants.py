@@ -8,6 +8,6 @@ Created on Sep 8, 2014
 
 key_registration_ids = 'registration_ids'
 key_data = 'data'
-key_error = 'errors'
+key_error = 'exception'
 key_api_key = 'api_key'
 MAX_MSG_SIZE = 1024
