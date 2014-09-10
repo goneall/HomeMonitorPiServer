@@ -8,6 +8,7 @@ Parameters: GCMServerKey (required), IP Address of relay server (optional), Port
 
 import shelve, time, sys, urllib2, logging
 import gcmclient
+import raspberrymonitor
 
 class RelayServerException(Exception): pass
 
@@ -33,6 +34,8 @@ public_ip_update_time = 1.0      # last time the public IP was updated
 time_to_refresh_public_ip = 1000 # number of seconds to wait before updating the public IP address
 
 logging.basicConfig(filename=log_file_name,level=logging.INFO)
+
+raspberry_monitor = raspberrymonitor.RaspberryMonitor()
 
 use_relay = False
 saServerGcm = None
@@ -116,17 +119,13 @@ def alarm_reset():
     # Alarm has been tripped
     sendMessageToAndroid('Alarm reset')
     logging.log(logging.INFO, 'Alarm reset message sent')
-    
-def is_alarm_on():
-    #TODO: Replace with code which checks for the switch
-    return True
 
 # main loop
 
 alarmtripped = False
 numerrors = 0   # Number of errors before a successful send message
 while True:
-    if is_alarm_on():
+    if raspberry_monitor.is_alarm_on():
         if alarmtripped:
             time.sleep(wait_time_for_alarm_reset)
         else:
