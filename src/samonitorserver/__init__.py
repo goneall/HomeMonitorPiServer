@@ -83,7 +83,7 @@ def sendMessageToAndroid(msg):
 
     if not savedata.has_key(key_registration_ids):
         savedata[key_registration_ids] = default_registration_ids
-        savedata.flush()
+        savedata.sync()
         
     reg_ids = savedata[key_registration_ids]
     if (use_relay):
