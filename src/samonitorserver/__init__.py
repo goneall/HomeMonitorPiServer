@@ -99,8 +99,11 @@ def sendMessageToAndroid(msg):
     if 'canonical' in response:
         for reg_id, canonical_id in response['canonical'].items():
             # Replace reg_id with canonical_id in your database
-            savedata[key_registration_ids].remove(reg_id)
-            savedata[key_registration_ids].append(canonical_id)
+            new_reg_ids = savedata[key_registration_ids]
+            new_reg_ids.remove(reg_id)
+            new_reg_ids.append(canonical_id)
+            savedata[key_registration_ids] = new_reg_ids
+            
             savedata.sync()
 
     
