@@ -49,7 +49,7 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
                 logging.info('Sent message number '+ str(request_num) + ' to GCM')
             else:
                 logging.error('Authentication failed from IP address '+str(self.client_address[0]))
-                response = {constants.key_error, 'Authentication Failed'}
+                response = {constants.key_error : 'Authentication Failed'}
             self.request.sendall(json.dumps(response))
         except Exception, e:
             logging.error('Exception during gcm_send: ' + e.message)
