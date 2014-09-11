@@ -10,4 +10,7 @@ key_registration_ids = 'registration_ids'
 key_data = 'data'
 key_error = 'exception'
 key_api_key = 'api_key'
+key_request_number = 'req_num'
+key_authentication = 'authentication'
 MAX_MSG_SIZE = 1024
+verification = 'USEDTOVERIFY2254'
