@@ -16,8 +16,8 @@ extra_home_monitor_url = "com.sourceauditor.sahomemonitor.homemonitorurl"
 extra_home_monitor_audio_url = "com.sourceauditor.sahomemonitor.homemonitoraudiourl"
 extra_message_from_home = "com.sourceauditor.sahomemonitor.messagefromhome"
 storage_file_name = 'samonitordata'
-# log_file_name = '/var/log/samonitor.log'
-log_file_name = 'samonitor.log'
+log_file_name = '/var/log/samonitor/samonitor.log'
+# log_file_name = 'samonitor.log'
 savedata = shelve.open(storage_file_name)
 default_registration_ids = ['APA91bFyjHVThTqfiOrFfH7TRiuaOhflDeaTqQR-k3DSAuhtN19Rnmu7zNLxp6VGC9Lk3QkBZRNRxwGL04xQARqLZgjfnWzQjet3WzSRP725v8Pw3v3ZcpOHYBrmuoBhYTdWjqK0b-37f700Czu-W4vj_8cJf4EAqEvShB0xSen3KYad-7CZMyc']
 key_registration_ids = 'registration_ids'
@@ -33,7 +33,7 @@ cached_public_ip = ""
 public_ip_update_time = 1.0      # last time the public IP was updated
 time_to_refresh_public_ip = 1000 # number of seconds to wait before updating the public IP address
 
-logging.basicConfig(filename=log_file_name,level=logging.INFO)
+logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
 
 raspberry_monitor = raspberrymonitor.RaspberryMonitor()
 

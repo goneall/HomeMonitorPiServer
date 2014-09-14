@@ -25,7 +25,7 @@ import gcmclient.gcm
 from pyotp.hotp import HOTP
 
 log_file_name = 'gcmrelayserver.log'
-logging.basicConfig(filename=log_file_name,level=logging.INFO)
+logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
 server_ip_address = '10.0.0.7'
 server_port = 13373
 hotp = HOTP(constants.verification)
