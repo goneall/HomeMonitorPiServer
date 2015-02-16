@@ -6,7 +6,7 @@ Google GCM.
 Parameters: GCMServerKey (required), IP Address of relay server (optional), Port number of relay server (optional)
 '''
 
-import shelve, time, sys, urllib2, logging
+import shelve, time, sys, urllib2, logging, socket
 import gcmclient
 import raspberrymonitor
 
@@ -42,6 +42,7 @@ saServerGcm = None
 relayClient = None
 relay_ip_address = '10.0.0.7'
 relay_port = 13373
+ip_reflector_port = 13374
 
 server_key = sys.argv[1]
 if len(sys.argv) > 2:
@@ -62,9 +63,11 @@ def getMyPublicIp():
     time_since_last_update = now - public_ip_update_time
     time_expired = time_since_last_update > time_to_refresh_public_ip
     if time_expired or cached_public_ip == "":
-        public_ip_update_time = now
-        response = urllib2.urlopen(ipecho_url)
-        cached_public_ip = response.read()
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((relay_ip_address, ip_reflector_port))
+        s.send('getIP')
+        cached_public_ip = s.recv(1024)
+        s.close()
     return cached_public_ip
     
 def getServerUrl():
