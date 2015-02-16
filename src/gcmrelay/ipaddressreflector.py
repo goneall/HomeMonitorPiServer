@@ -6,12 +6,7 @@ Created on Feb 15, 2015
 '''
 
 import sys
-import logging
 import SocketServer
-import json
-import constants
-import gcmclient.gcm
-from pyotp.hotp import HOTP
 
 server_ip_address = '10.0.0.7'
 server_port = 13374
