@@ -119,9 +119,18 @@ def alarm_reset():
     # Alarm has been tripped
     sendMessageToAndroid('Alarm reset')
     logging.log(logging.INFO, 'Alarm reset message sent')
+    
+def started():
+    # Monitor has been (re)started
+    sendMessageToAndroid('SA Monitor Started')
+    logging.log(logging.INFO, 'Starting SA Monitor')
+    
+def doorbell():
+    sendMessageToAndroid('Doorbell')
+    logging.log(logging.INFO, 'Doorbell')
 
 # main loop
-
+started()
 alarmtripped = False
 numerrors = 0   # Number of errors before a successful send message
 while True:
