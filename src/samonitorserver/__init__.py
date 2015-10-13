@@ -168,7 +168,7 @@ while True:
                     break
             alarmtripped = False
     if raspberrymonitor.is_doorbell_on():
-        if !doorbellpressed:
+        if not doorbellpressed:
             doorbell()
             doorbellpressed = True
     else:
