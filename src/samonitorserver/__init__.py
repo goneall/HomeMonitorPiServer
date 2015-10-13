@@ -167,7 +167,7 @@ while True:
                 if numerrors > max_errors:
                     break
             alarmtripped = False
-    if raspberrymonitor.is_doorbell_on():
+    if raspberry_monitor.is_doorbell_on():
         if not doorbellpressed:
             doorbell()
             doorbellpressed = True
