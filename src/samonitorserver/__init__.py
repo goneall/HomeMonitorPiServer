@@ -130,7 +130,7 @@ def started():
     logging.log(logging.INFO, 'Starting SA Monitor')
     
 def doorbell():
-    raspberrymonitor.playwave(wave_file_name)
+    raspberry_monitor.playwave(wave_file_name)
     sendMessageToAndroid('Doorbell')
     logging.log(logging.INFO, 'Doorbell')
 
