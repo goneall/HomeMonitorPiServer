@@ -17,6 +17,7 @@ extra_home_monitor_audio_url = "com.sourceauditor.sahomemonitor.homemonitoraudio
 extra_message_from_home = "com.sourceauditor.sahomemonitor.messagefromhome"
 storage_file_name = 'samonitordata'
 log_file_name = '/var/log/samonitor/samonitor.log'
+wave_file_name = '/etc/samonitor/doorbell.wav'
 # log_file_name = 'samonitor.log'
 savedata = shelve.open(storage_file_name)
 default_registration_ids = ['APA91bHJzeHJUUL4jQ_cWsxk-Dc2cnnbdfecxrp7RAmq3r-EwdJ2QekokUbIg4Zc5Aw_2QPt_IYQrzA7XhNJyls8u9RPvXN-rJr9PWoPhXEt22jOMN3ZtpXxqg8pmhLgwUVEGKkpMq0vMJ8r8Y8WQ-_7vBRzaDrJzitPZkeC20it2clmvCPczvQ']
@@ -129,12 +130,14 @@ def started():
     logging.log(logging.INFO, 'Starting SA Monitor')
     
 def doorbell():
+    raspberrymonitor.playwave(wave_file_name)
     sendMessageToAndroid('Doorbell')
     logging.log(logging.INFO, 'Doorbell')
 
 # main loop
 started()
 alarmtripped = False
+doorbellpressed = False
 numerrors = 0   # Number of errors before a successful send message
 while True:
     if raspberry_monitor.is_alarm_on():
@@ -164,4 +167,11 @@ while True:
                 if numerrors > max_errors:
                     break
             alarmtripped = False
+    if raspberrymonitor.is_doorbell_on():
+        if !doorbellpressed:
+            doorbell()
+            doorbellpressed = True
+    else:
+        if doorbellpressed:
+            doorbellpressed = False
     time.sleep(alarm_poll_wait_time)

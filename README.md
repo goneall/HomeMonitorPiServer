@@ -7,4 +7,6 @@ Usage:
 
 Run the samonitorserver module from the command line with a single parameter containing the GCM API Key obtained from Google (see http://developer.android.com/guide/google/gcm/gcm.html).
 
-An optional relay server can be setup to relay the GCM messages from a different server.  See the documentation in the gcmrelay modules for more information.  The value use_gcm_relay in the samonitorserver determins whether the relay server is used.
+An optional relay server can be setup to relay the GCM messages from a different server.  See the documentation in the gcmrelay modules for more information.  The value use_gcm_relay in the samonitorserver determines whether the relay server is used.
+
+For the doorbell, the wave file to be played is stored in /etc/samonitor/doorbell.wav
