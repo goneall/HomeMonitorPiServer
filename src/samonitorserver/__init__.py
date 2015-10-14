@@ -169,7 +169,14 @@ while True:
             alarmtripped = False
     if raspberry_monitor.is_doorbell_on():
         if not doorbellpressed:
-            doorbell()
+            try:
+                doorbell()
+            except Exception as e:
+                savedata[key_last_exception] = e
+                print "Error trying to ring doorbell:", e
+                numerrors = numerrors + 1
+                if numerrors > max_errors:
+                    break
             doorbellpressed = True
     else:
         if doorbellpressed:

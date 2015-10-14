@@ -26,4 +26,5 @@ class RaspberryMonitor(object):
     def playwave(self, wavefile):
         pygame.mixer.init()
         pygame.mixer.music.load(wavefile)
+        pygame.mixer.music.set_volume(1)
         pygame.mixer.music.play()
