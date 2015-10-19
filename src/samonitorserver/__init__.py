@@ -8,7 +8,7 @@ Parameters: GCMServerKey (required), IP Address of relay server (optional), Port
 
 import shelve, time, sys, urllib2, logging, socket
 import gcmclient
-import raspberrymonitor
+from raspberrysupport import raspberrymonitor
 
 class RelayServerException(Exception): pass
 

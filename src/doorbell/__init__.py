@@ -4,12 +4,12 @@ Raspberry PI GPIO and plays a wav file if the doorbell is detected
 '''
 
 import time
-import samonitorserver
+from raspberrysupport import raspberrymonitor
 
 wave_file_name = '/etc/samonitor/doorbell.wav'
 alarm_poll_wait_time = 1.0
 max_errors = 100
-raspberry_monitor = samonitorserver.raspberrymonitor.RaspberryMonitor()
+raspberry_monitor = raspberrymonitor.RaspberryMonitor()
 
     
 def doorbell():
