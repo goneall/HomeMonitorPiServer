@@ -4,8 +4,8 @@ import json
 from collections import defaultdict
 import time
 import random
-
-GCM_URL = 'https://android.googleapis.com/gcm/send'
+GCM_URL = 'https://fcm.googleapis.com/fcm/send'
+# GCM_URL = 'https://android.googleapis.com/gcm/send' - OLD google cloud messaging
 
 
 class GCMException(Exception): pass
