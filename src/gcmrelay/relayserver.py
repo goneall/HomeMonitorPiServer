@@ -1,7 +1,11 @@
 '''
 The purpose of the gcmrelay package is to provide a mechanism for sending GCM message
-to Google from a known IP address when the actual message may original from a machine
+to Google from a known IP address when the actual message may originate from a machine
 with changing IP addresses (e.g. something within a home network).
+
+The gcmrelay will also relay requests to add new registration keys.  This is accomplished by
+adding the newly requested registration ID's to the response in the client.  The client should
+add these additional requests to the server.
 
 relayserver is a relay server module for a TCP server which runs on a machine with a known IP address
 The relay server essentially listens to an IP address for connections from the relay
@@ -34,26 +38,48 @@ class GcmRelayServer(SocketServer.ThreadingTCPServer):
     allow_reuse_address = True
 
 class GcmRelayHandler(SocketServer.BaseRequestHandler):
+    
+    def __init__(self):
+        self.added_tokens = []  # Tokens which have been added by request registration
+        
     def handle(self):
         try:
             gcmpayload = json.loads(self.request.recv(constants.MAX_MSG_SIZE).strip())
             # parse out the data
             request_num = gcmpayload[constants.key_request_number]
+            request = gcmpayload[constants.key_request]
             auth = gcmpayload[constants.key_authentication]
             reg_ids = gcmpayload[constants.key_registration_ids]
-            gcm_data = gcmpayload[constants.key_data]
-            api_key = gcmpayload[constants.key_api_key]
-            saServerGcm = gcmclient.gcm.GCM(api_key)
             if (hotp.verify(auth, request_num)):
-                response = saServerGcm.json_request(registration_ids=reg_ids, data=gcm_data)
-                logging.info('Sent message number '+ str(request_num) + ' to GCM')
+                if request == constants.request_forward_gcm_message:
+                    for regid in reg_ids:
+                        if not (regid in self.added_tokens):
+                            self.added_tokens.push(regid)
+                    response = {constants.key_status : constants.status_success}
+                    logging.info('Added registration ids' + reg_ids)
+                else:
+                    gcm_data = gcmpayload[constants.key_data]
+                    api_key = gcmpayload[constants.key_api_key]
+                    # append any missing clients
+                    for regid in reg_ids:
+                        if regid in self.added_tokens:
+                            self.added_tokens.remove(regid)
+                    for added_token in self.added_tokens:
+                        reg_ids.push(added_token)
+                        logging.warn("Adding token to message: "+added_token) 
+                    saServerGcm = gcmclient.gcm.GCM(api_key)
+                    response = saServerGcm.json_request(registration_ids=reg_ids, data=gcm_data)
+                    # respond with any missing registration ID's
+                    if len(self.added_tokens) > 0:
+                        response[constants.key_additional_registration] = self.added_tokens
+                    logging.info('Sent message number '+ str(request_num) + ' to GCM')
             else:
                 logging.error('Authentication failed from IP address '+str(self.client_address[0]))
-                response = {constants.key_error : 'Authentication Failed'}
+                response = {constants.key_error : 'Authentication Failed', constants.key_status : constants.status_error}
             self.request.sendall(json.dumps(response))
         except Exception, e:
             logging.error('Exception during gcm_send: ' + e.message)
-            response = {constants.key_error : 'Exception from gcm_send: ' + e.message}
+            response = {constants.key_error : 'Exception from gcm_send: ' + e.message, constants.key_status : constants.status_error}
             self.request.sendall(json.dumps(response))
 
 if __name__ == '__main__':

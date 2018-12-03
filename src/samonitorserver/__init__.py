@@ -8,6 +8,7 @@ Parameters: GCMServerKey (required), IP Address of relay server (optional), Port
 
 import shelve, time, sys, urllib2, logging, socket
 import gcmclient
+from gcmrelay import constants
 from raspberrysupport import raspberrymonitor
 
 class RelayServerException(Exception): pass
@@ -110,9 +111,13 @@ def sendMessageToAndroid(msg):
             new_reg_ids.remove(reg_id)
             new_reg_ids.append(canonical_id)
             savedata[key_registration_ids] = new_reg_ids
-            
             savedata.sync()
-
+    if constants.key_additional_registration in response:  # these are inserted by the relay server if there is a new registration id
+        new_reg_ids = savedata[key_registration_ids]
+        for reg_id in response[constants.key_additional_registration]:
+            new_reg_ids.append(reg_id)
+            savedata[key_registration_ids] = new_reg_ids
+            savedata.sync()
     
 def alarm():
     # Alarm has been tripped

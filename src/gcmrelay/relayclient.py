@@ -31,6 +31,7 @@ class GcmRelayClient:
     def send(self, registration_ids, data):
         auth = self.hotp.at(self.request_num)
         payload = {constants.key_api_key : self.api_key, 
+                   constants.key_request : constants.request_forward_gcm_message,
                    constants.key_registration_ids : registration_ids,
                    constants.key_request_number : self.request_num,
                    constants.key_authentication : auth}
