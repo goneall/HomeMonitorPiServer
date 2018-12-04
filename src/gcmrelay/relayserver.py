@@ -27,6 +27,7 @@ import json
 import constants
 import gcmclient.gcm
 from pyotp.hotp import HOTP
+import pdb
 
 log_file_name = 'gcmrelayserver.log'
 logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
@@ -39,11 +40,11 @@ class GcmRelayServer(SocketServer.ThreadingTCPServer):
 
 class GcmRelayHandler(SocketServer.BaseRequestHandler):
     
-    def __init__(self):
-        self.added_tokens = []  # Tokens which have been added by request registration
-        
     def handle(self):
         try:
+            pdb.set_trace()
+            if not hasattr(self, 'added_tokens'):
+                self.added_tokens = []
             gcmpayload = json.loads(self.request.recv(constants.MAX_MSG_SIZE).strip())
             # parse out the data
             request_num = gcmpayload[constants.key_request_number]
@@ -51,12 +52,12 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
             auth = gcmpayload[constants.key_authentication]
             reg_ids = gcmpayload[constants.key_registration_ids]
             if (hotp.verify(auth, request_num)):
-                if request == constants.request_forward_gcm_message:
+                if request == constants.request_register_token:
                     for regid in reg_ids:
                         if not (regid in self.added_tokens):
                             self.added_tokens.append(regid)
                     response = {constants.key_status : constants.status_success}
-                    logging.info('Added registration ids' + reg_ids)
+                    logging.info('Added registration ids '.join(reg_ids))
                 else:
                     gcm_data = gcmpayload[constants.key_data]
                     api_key = gcmpayload[constants.key_api_key]
