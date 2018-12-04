@@ -16,7 +16,7 @@ import constants
 from pyotp.hotp import HOTP
 
 def recieveJson(skt):
-    skt.settimeout(1.0)
+    skt.settimeout(3.0)
     json = ''
     try:
         ch = skt.recv(1)
