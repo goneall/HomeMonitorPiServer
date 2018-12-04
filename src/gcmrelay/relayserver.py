@@ -54,7 +54,7 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
                 if request == constants.request_forward_gcm_message:
                     for regid in reg_ids:
                         if not (regid in self.added_tokens):
-                            self.added_tokens.push(regid)
+                            self.added_tokens.append(regid)
                     response = {constants.key_status : constants.status_success}
                     logging.info('Added registration ids' + reg_ids)
                 else:
@@ -65,7 +65,7 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
                         if regid in self.added_tokens:
                             self.added_tokens.remove(regid)
                     for added_token in self.added_tokens:
-                        reg_ids.push(added_token)
+                        reg_ids.append(added_token)
                         logging.warn("Adding token to message: "+added_token) 
                     saServerGcm = gcmclient.gcm.GCM(api_key)
                     response = saServerGcm.json_request(registration_ids=reg_ids, data=gcm_data)

@@ -41,7 +41,7 @@ class GcmRelayClient:
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((self.ip_address, self.port))
-            s.send(json.dumps(payload))
+            s.sendall(json.dumps(payload))
             result = json.loads(s.recv(constants.MAX_MSG_SIZE))          
         except Exception as e:
             result = {constants.key_error : 'Exception from client send: ' + e.message}
