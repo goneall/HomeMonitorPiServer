@@ -28,7 +28,6 @@ import constants
 import gcmclient.gcm
 from pyotp.hotp import HOTP
 from relayclient import recieveJson
-import pdb
 
 log_file_name = 'gcmrelayserver.log'
 logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
@@ -43,10 +42,10 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
     
     def handle(self):
         try:
-            pdb.set_trace()
             if not hasattr(self, 'added_tokens'):
                 self.added_tokens = []
-            gcmpayload = json.loads(recieveJson(self.request.recv))
+            sJson = recieveJson(self.request)
+            gcmpayload = json.loads(sJson)
             # parse out the data
             request_num = gcmpayload[constants.key_request_number]
             request = gcmpayload[constants.key_request]
