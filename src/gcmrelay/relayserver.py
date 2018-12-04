@@ -28,12 +28,15 @@ import constants
 import gcmclient.gcm
 from pyotp.hotp import HOTP
 from relayclient import recieveJson
+from threading import Lock
 
 log_file_name = 'gcmrelayserver.log'
 logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
 server_ip_address = '10.0.0.7'
 server_port = 13373
 hotp = HOTP(constants.verification)
+tokens_lock = Lock()
+added_tokens = []
 
 class GcmRelayServer(SocketServer.ThreadingTCPServer):
     allow_reuse_address = True
@@ -42,8 +45,6 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
     
     def handle(self):
         try:
-            if not hasattr(self, 'added_tokens'):
-                self.added_tokens = []
             sJson = recieveJson(self.request)
             gcmpayload = json.loads(sJson)
             # parse out the data
@@ -53,26 +54,29 @@ class GcmRelayHandler(SocketServer.BaseRequestHandler):
             reg_ids = gcmpayload[constants.key_registration_ids]
             if (hotp.verify(auth, request_num)):
                 if request == constants.request_register_token:
-                    for regid in reg_ids:
-                        if not (regid in self.added_tokens):
-                            self.added_tokens.append(regid)
-                    response = {constants.key_status : constants.status_success}
-                    logging.info('Added registration ids '.join(reg_ids))
+                    with tokens_lock:
+                        for regid in reg_ids:
+                            if not (regid in added_tokens):
+                                added_tokens.append(regid)
+                        response = {constants.key_status : constants.status_success}
+                        logging.info('Added registration ids '.join(reg_ids))
                 else:
                     gcm_data = gcmpayload[constants.key_data]
                     api_key = gcmpayload[constants.key_api_key]
                     # append any missing clients
-                    for regid in reg_ids:
-                        if regid in self.added_tokens:
-                            self.added_tokens.remove(regid)
-                    for added_token in self.added_tokens:
-                        reg_ids.append(added_token)
-                        logging.warn("Adding token to message: "+added_token) 
+                    with tokens_lock:
+                        for regid in reg_ids:
+                            if regid in added_tokens:
+                                added_tokens.remove(regid)
+                        for added_token in added_tokens:
+                            reg_ids.append(added_token)
+                            logging.warn("Adding token to message: "+added_token) 
                     saServerGcm = gcmclient.gcm.GCM(api_key)
                     response = saServerGcm.json_request(registration_ids=reg_ids, data=gcm_data)
                     # respond with any missing registration ID's
-                    if len(self.added_tokens) > 0:
-                        response[constants.key_additional_registration] = self.added_tokens
+                    with tokens_lock:
+                        if len(added_tokens) > 0:
+                            response[constants.key_additional_registration] = added_tokens
                     logging.info('Sent message number '+ str(request_num) + ' to GCM')
             else:
                 logging.error('Authentication failed from IP address '+str(self.client_address[0]))
