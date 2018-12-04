@@ -15,6 +15,31 @@ import json
 import constants
 from pyotp.hotp import HOTP
 
+def recieveJson(skt):
+    skt.settimeout(1.0)
+    retval = ''
+    try:
+        ch = skt.recv(1)
+        if ch != '{':
+            raise Exception("Invalid JSON response - missing '{'")
+        braceCount = 1
+        retval.join(ch)
+        while braceCount > 0 and len(retval) < constants.MAX_MSG_SIZE:
+            ch = skt.recv(1)
+            if ch == '{':
+                braceCount = braceCount + 1
+            elif ch == '}':
+                braceCount = braceCount - 1
+            retval.join(ch)
+        if len(retval) >= constants.MAX_MSG_SIZE:
+            raise Exception("Invalid JSON response -exceeds maximum size")
+    except socket.timeout:
+        return retval
+    return retval
+        
+    
+    
+
 class GcmRelayClient:
     
     hotp = HOTP(constants.verification)
@@ -42,7 +67,7 @@ class GcmRelayClient:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.connect((self.ip_address, self.port))
             s.sendall(json.dumps(payload))
-            result = json.loads(s.recv(constants.MAX_MSG_SIZE))          
+            result = json.loads(recieveJson(s))          
         except Exception as e:
             result = {constants.key_error : 'Exception from client send: ' + e.message}
         finally:
