@@ -19,5 +19,5 @@ key_api_key = 'api_key'
 key_request_number = 'req_num'
 key_authentication = 'authentication'
 key_additional_registration = 'new_registration'
-MAX_MSG_SIZE = 1024
+MAX_MSG_SIZE = 4096
 verification = 'USEDTOVERIFY2254'
