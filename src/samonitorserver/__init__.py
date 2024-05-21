@@ -3,121 +3,44 @@ Main server script - continuously polls for alarm signals on the
 Raspberry PI GPIO and sends a message to the Android app through
 Google GCM.
 
-Parameters: GCMServerKey (required), IP Address of relay server (optional), Port number of relay server (optional)
+Parameters: Pushover app token (required), Pushover user key (required)
 '''
 
-import shelve, time, sys, urllib2, logging, socket
-import gcmclient
-from gcmrelay import constants
+import shelve, time, sys, urllib, http.client, logging, socket
 from raspberrysupport import raspberrymonitor
 
 class RelayServerException(Exception): pass
 
-extra_home_monitor_url = "com.sourceauditor.sahomemonitor.homemonitorurl"
-extra_home_monitor_audio_url = "com.sourceauditor.sahomemonitor.homemonitoraudiourl"
-extra_message_from_home = "com.sourceauditor.sahomemonitor.messagefromhome"
 storage_file_name = 'samonitordata'
 log_file_name = '/var/log/samonitor/samonitor.log'
 wave_file_name = '/etc/samonitor/doorbell.wav'
+
 # log_file_name = 'samonitor.log'
 savedata = shelve.open(storage_file_name)
-default_registration_ids = ['fK_yLQRxqhM:APA91bHRTtqLypXq9yc66IW45-7bwCKOpV695PE1NIy8NrS_do4Vg6Ff29VOI0cf2q5yuwSt_kL-wzuMZey0hwtiYe8DXQjiky33K1Bsv3SPigwnbgXRYofHYNUJqrX490RxplA_bCAS']
-key_registration_ids = 'registration_ids'
-key_last_exception = 'lastexception'
 wait_time_for_alarm_reset = 10.0
 alarm_poll_wait_time = 0.4
 max_errors = 100
-ipecho_url = 'http://ipecho.net/plain'
-server_port = '8081'
-audio_port = '8000'
-audio_mountpoint = 'webcam'
-cached_public_ip = ""
-public_ip_update_time = 1.0      # last time the public IP was updated
-time_to_refresh_public_ip = 1000 # number of seconds to wait before updating the public IP address
 
 logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
 
 raspberry_monitor = raspberrymonitor.RaspberryMonitor()
 
-use_relay = False
-saServerGcm = None
-relayClient = None
-relay_ip_address = '10.0.0.7'
-relay_port = 13373
-ip_reflector_port = 13374
-
-server_key = sys.argv[1]
-if len(sys.argv) > 2:
-    use_relay = True
-    relay_ip_address = sys.argv[2]
-if len(sys.argv) > 3:
-    relay_port = sys.argv[3]
-if use_relay:
-    import gcmrelay.relayclient
-    relayClient = gcmrelay.relayclient.GcmRelayClient(relay_ip_address, relay_port, server_key)
-if not use_relay:
-    saServerGcm = gcmclient.GCM(server_key)
-
-def getMyPublicIp():
-    global public_ip_update_time
-    global cached_public_ip
-    now = time.time()
-    time_since_last_update = now - public_ip_update_time
-    time_expired = time_since_last_update > time_to_refresh_public_ip
-    if time_expired or cached_public_ip == "":
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((relay_ip_address, ip_reflector_port))
-        s.send('getIP')
-        cached_public_ip = s.recv(1024)
-        s.close()
-    return cached_public_ip
+pushover_app_token = sys.argv[1]
+pushover_user_key = sys.argv[2]
     
-def getServerUrl():
-    retval = 'http://' + getMyPublicIp() + ':' + server_port
-    return retval
-
-def getAudioUrl():
-    retval = 'http://' + getMyPublicIp() + ':' + audio_port + '/' + audio_mountpoint
-    return retval
-
 def sendMessageToAndroid(msg):
     # Sends a message to Andorid device
-    data = {extra_home_monitor_url: getServerUrl(), 
-            extra_home_monitor_audio_url: getAudioUrl(),
-            extra_message_from_home: msg}
-
-    if not savedata.has_key(key_registration_ids):
-        savedata[key_registration_ids] = default_registration_ids
-        savedata.sync()
-        
-    reg_ids = savedata[key_registration_ids]
-    if (use_relay):
-        response = relayClient.send(registration_ids=reg_ids, data=data)
-    else:
-        response = saServerGcm.json_request(registration_ids=reg_ids, data=data)
-    if 'exception' in response:
-        raise RelayServerException(response['exception'])
-    if 'errors' in response:
-        for error, reg_ids in response['errors'].items():
-            # Check for errors and act accordingly
-            if error is 'NotRegistered':
-                # Remove reg_ids from database
-                for reg_id in reg_ids:
-                    savedata[key_registration_ids].remove(reg_id)
-    if 'canonical' in response:
-        for reg_id, canonical_id in response['canonical'].items():
-            # Replace reg_id with canonical_id in your database
-            new_reg_ids = savedata[key_registration_ids]
-            new_reg_ids.remove(reg_id)
-            new_reg_ids.append(canonical_id)
-            savedata[key_registration_ids] = new_reg_ids
-            savedata.sync()
-    if constants.key_additional_registration in response:  # these are inserted by the relay server if there is a new registration id
-        new_reg_ids = savedata[key_registration_ids]
-        for reg_id in response[constants.key_additional_registration]:
-            new_reg_ids.append(reg_id)
-            savedata[key_registration_ids] = new_reg_ids
-            savedata.sync()
+    conn = http.client.HTTPSConnection("api.pushover.net:443")
+    conn.request("POST", "/1/messages.json",
+            urllib.parse.urlencode({
+                "token": pushover_app_token,
+                "user": pushover_user_key,
+                "message": msg
+            }), { "Content-type": "application/x-www-form-urlencoded" })
+    response = conn.getresponse()
+    if response.status != 200:
+        logging.log(logging.ERROR, "Error returned from Pushover")
+        logging.log(logging.ERROR, response.reason)
     
 def alarm():
     # Alarm has been tripped
@@ -144,6 +67,7 @@ started()
 alarmtripped = False
 doorbellpressed = False
 numerrors = 0   # Number of errors before a successful send message
+
 while True:
     if raspberry_monitor.is_alarm_on():
         if alarmtripped:
@@ -187,3 +111,4 @@ while True:
         if doorbellpressed:
             doorbellpressed = False
     time.sleep(alarm_poll_wait_time)
+'''
