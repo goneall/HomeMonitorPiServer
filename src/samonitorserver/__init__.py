@@ -3,10 +3,11 @@ Main server script - continuously polls for alarm signals on the
 Raspberry PI GPIO and sends a message to the Android app through
 Google GCM.
 
-Parameters: Pushover app token (required), Pushover user key (required), MQTT broker user (required), MQTT broker password (required)
+Parameters: Pushover app token (required), Pushover user key (required), MQTT broker user (required), 
+            MQTT broker password (required), HomeAssistant Discovery (optional True or False)
 '''
 
-import shelve, time, sys, urllib, http.client, logging, socket
+import shelve, time, sys, urllib, http.client, logging, socket, json, uuid
 from raspberrysupport import raspberrymonitor
 from paho.mqtt import client as mqtt_client
 
@@ -25,8 +26,39 @@ max_errors = 100
 # MQTT constants
 broker = '10.0.0.104'
 port = 1883
-topic = "samonitor"
-client_id = 'alarm-pi-034a3fd5-5907-46fd-a3fc-430e949de802'
+
+mac = hex(uuid.getnode())
+client_id = 'alarm-pi-'+mac
+
+topic_prefix = "samonitor/" + client_id + "/"
+availability_topic = topic_prefix + "status"
+alarm_last_topic = topic_prefix + "alarm/last"
+alarm_state_topic = topic_prefix + "alarm/state"
+doorbell_state_topic = topic_prefix + "doorbell/state"
+alarm_config_topic = "homeassistant/binary_sensor/" + client_id + "_alarm/config"
+doorbell_config_topic = "homeassistant/sensor/" + client_id + "_doorbell/config"
+
+alarmConfig = {
+        "name": "Home Alarm",
+        "unique_id": client_id + "_alarm",
+        "state_topic": alarm_state_topic,
+        "availability_topic": availability_topic,
+        "device": {
+            "name": "SA Home Monitor",
+            "identifiers": client_id,
+            "model": "Raspberry Pi B+",
+            "sw_version": "1.0.0"
+            }
+        }
+doorbellConfig = {
+        "name": "Home Doorbell",
+        "unique_id": client_id + "_doorbell",
+        "state_topic": doorbell_state_topic,
+        "availability_topic": availability_topic,
+        "device": {
+            "identifiers": client_id
+            }
+        }
 
 logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
 
@@ -36,6 +68,15 @@ pushover_app_token = sys.argv[1]
 pushover_user_key = sys.argv[2]
 mqtt_user = sys.argv[3]
 mqtt_password = sys.argv[4]
+haDiscoveryEnable = False
+haDiscoveryDisable = False
+if len(sys.argv) > 5:
+    if sys.argv[5] == 'True':
+        haDiscoveryEnable = True
+    elif sys.argv[6] == 'False':
+        haDiscoverDisable = True
+    else:
+        print('Invalid HA discovery option - must be True or False: '+sys.argv[5])
 
 def connect_mqtt():
     def on_connect(client, userdata, flags, rc):
@@ -93,34 +134,35 @@ def sendMessageToAndroid(msg):
         logging.log(logging.ERROR, "Error returned from Pushover")
         logging.log(logging.ERROR, response.reason)
 
-def sendMessageToMqtt(sub_topic, msg):
-    result = client.publish(topic + "/" + sub_topic, msg)
+def sendMessageToMqtt(topic, msg, retain: False):
+    result = client.publish(topic, msg, retain)
     status = result[0]
     if status != 0:
         logging.log(logging.ERROR, 'Failed to send message to MQTT')
-    
+
 def alarm():
     # Alarm has been tripped
     sendMessageToAndroid('Home Alarm Tripped')
-    sendMessageToMqtt('alarm_tripped', 'Home alarm tripped')
+    sendMessageToMqtt(alarm_last_topic, 'Home alarm tripped at '.strftime("%m/%d/%Y, %H:%M:%S"), True)
+    sendMessageToMqtt(alarm_state_topic, '{"state":"ON"}', False)
     logging.log(logging.INFO, 'Alarm tripped message sent')
     
 def alarm_reset():
     # Alarm has been tripped
     sendMessageToAndroid('Alarm reset')
-    sendMessageToMqtt('alarm_reset', 'Home alarm reset')
+    sendMessageToMqtt(alarm_state_topic, '{"state":"OFF"}', False)
     logging.log(logging.INFO, 'Alarm reset message sent')
     
 def started():
     # Monitor has been (re)started
     sendMessageToAndroid('SA Monitor Started')
-    sendMessageToMqtt('started', 'SA Monitor Started')
+    sendMessageToMqtt(availability_topic, 'online', False)
     logging.log(logging.INFO, 'Starting SA Monitor')
     
 def doorbell():
 #    raspberry_monitor.playwave(wave_file_name)
     sendMessageToAndroid('Doorbell pressed')
-    sendMessageToMqtt('doorbell', 'Dorbell pressed');
+    sendMessageToMqtt(doorbell_state_topic, '{"event_type": "press"}', False) 
     logging.log(logging.INFO, 'Doorbell')
 
 # main loop
@@ -130,6 +172,12 @@ doorbellpressed = False
 numerrors = 0   # Number of errors before a successful send message
 
 try:
+    if haDiscoveryEnable:
+        sendMessageToMqtt(alarm_config_topic, json.dumps(alarmConfig), True)
+        sendMessageToMqtt(doorbell_config_topic, json.dumps(doorbellConfig), True)
+    elif haDiscoveryDisable:
+        sendMessageToMqtt('alarm', '', True)
+        sendMessageToMqtt('doorbell', '', True)
     while True:
         if raspberry_monitor.is_alarm_on():
             if alarmtripped:
@@ -174,8 +222,8 @@ try:
                 doorbellpressed = False
         time.sleep(alarm_poll_wait_time)
 except Exception as e:
-    print("Unhandled exception: "+e)
-    logging.log(logging.ERROR, 'Unhandled exception' + e)
+    print("Unhandled exception: "+str(e))
+    logging.log(logging.ERROR, 'Unhandled exception' + str(e))
 finally:
-    sendMessageToMqtt('ending', 'SA Monitor shutting down')
+    sendMessageToMqtt(availability_topic, 'offline', True)
     sendMessageToAndroid('SA Monitor shutting down')
