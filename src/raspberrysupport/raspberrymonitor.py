@@ -6,7 +6,6 @@ Created on Sep 9, 2014
 '''
 
 import RPi.GPIO as GPIO
-import pygame
 
 alarm_pin = 17
 doorbell_pin = 18
@@ -23,8 +22,3 @@ class RaspberryMonitor(object):
     def is_doorbell_on(self):
         retval = (GPIO.input(doorbell_pin) == True)
         return retval
-    def playwave(self, wavefile):
-        pygame.mixer.init()
-        pygame.mixer.music.load(wavefile)
-        pygame.mixer.music.set_volume(1)
-        pygame.mixer.music.play()

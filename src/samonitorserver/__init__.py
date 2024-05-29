@@ -7,20 +7,19 @@ Parameters: Pushover app token (required), Pushover user key (required), MQTT br
             MQTT broker password (required), HomeAssistant Discovery (optional True or False)
 '''
 
-import shelve, time, sys, urllib, http.client, logging, socket, json, uuid
+import time, sys, urllib, http.client, logging, socket, json, uuid, subprocess
+from datetime import datetime
 from raspberrysupport import raspberrymonitor
 from paho.mqtt import client as mqtt_client
 
 class RelayServerException(Exception): pass
 
-storage_file_name = 'samonitordata'
 log_file_name = '/var/log/samonitor/samonitor.log'
 wave_file_name = '/etc/samonitor/doorbell.wav'
 
 # log_file_name = 'samonitor.log'
-savedata = shelve.open(storage_file_name)
 wait_time_for_alarm_reset = 10.0
-alarm_poll_wait_time = 0.4
+alarm_poll_wait_time = 0.3 
 max_errors = 100
 
 # MQTT constants
@@ -35,8 +34,10 @@ availability_topic = topic_prefix + "status"
 alarm_last_topic = topic_prefix + "alarm/last"
 alarm_state_topic = topic_prefix + "alarm/state"
 doorbell_state_topic = topic_prefix + "doorbell/state"
+doorbell_sensor_topic = topic_prefix + "doorbell/last"
 alarm_config_topic = "homeassistant/binary_sensor/" + client_id + "_alarm/config"
 doorbell_config_topic = "homeassistant/sensor/" + client_id + "_doorbell/config"
+doorbell_pressed_config_topic = "homeassistant/event/" + client_id + "_doorbell_pressed/config"
 
 alarmConfig = {
         "name": "Home Alarm",
@@ -53,7 +54,18 @@ alarmConfig = {
 doorbellConfig = {
         "name": "Home Doorbell",
         "unique_id": client_id + "_doorbell",
+        "state_topic": doorbell_sensor_topic,
+        "availability_topic": availability_topic,
+        "device": {
+            "identifiers": client_id
+            }
+        }
+
+doorbellPressedConfig = {
+        "name": "Home Doorbell Pressed",
+        "unique_id": client_id + "_doorbell_pressed",
         "state_topic": doorbell_state_topic,
+        "event_types": ["press"],
         "availability_topic": availability_topic,
         "device": {
             "identifiers": client_id
@@ -61,6 +73,11 @@ doorbellConfig = {
         }
 
 logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)s %(message)s')
+
+# DEBUG DEBUG
+# print("Before monitor start")
+# subprocess.call(['aplay', wave_file_name])
+# DEBUG DEBUG
 
 raspberry_monitor = raspberrymonitor.RaspberryMonitor()
 
@@ -73,8 +90,9 @@ haDiscoveryDisable = False
 if len(sys.argv) > 5:
     if sys.argv[5] == 'True':
         haDiscoveryEnable = True
-    elif sys.argv[6] == 'False':
-        haDiscoverDisable = True
+    elif sys.argv[5] == 'False':
+        haDiscoveryDisable = True
+        print('Discovery disabled set')
     else:
         print('Invalid HA discovery option - must be True or False: '+sys.argv[5])
 
@@ -98,7 +116,7 @@ RECONNECT_RATE = 2
 MAX_RECONNECT_COUNT = 12
 MAX_RECONNECT_DELAY = 60
 
-def on_disconnect(client, userdata, rc):
+def on_disconnect(client, userdata, rc, properties=None):
     print("Disconnected with result code")
     print(rc)
     reconnect_count, reconnect_delay = 0, FIRST_RECONNECT_DELAY
@@ -143,30 +161,33 @@ def sendMessageToMqtt(topic, msg, retain: False):
 def alarm():
     # Alarm has been tripped
     sendMessageToAndroid('Home Alarm Tripped')
-    sendMessageToMqtt(alarm_last_topic, 'Home alarm tripped at '.strftime("%m/%d/%Y, %H:%M:%S"), True)
-    sendMessageToMqtt(alarm_state_topic, '{"state":"ON"}', False)
+    sendMessageToMqtt(alarm_last_topic, 'Home alarm tripped at ' + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), True)
+    sendMessageToMqtt(alarm_state_topic, 'ON', False)
     logging.log(logging.INFO, 'Alarm tripped message sent')
     
 def alarm_reset():
     # Alarm has been tripped
     sendMessageToAndroid('Alarm reset')
-    sendMessageToMqtt(alarm_state_topic, '{"state":"OFF"}', False)
+    sendMessageToMqtt(alarm_state_topic, 'OFF', False)
     logging.log(logging.INFO, 'Alarm reset message sent')
     
 def started():
     # Monitor has been (re)started
     sendMessageToAndroid('SA Monitor Started')
     sendMessageToMqtt(availability_topic, 'online', False)
+    sendMessageToMqtt(doorbell_sensor_topic, 'Just started', False)
+    sendMessageToMqtt(alarm_state_topic, 'OFF', False)
     logging.log(logging.INFO, 'Starting SA Monitor')
     
 def doorbell():
-#    raspberry_monitor.playwave(wave_file_name)
     sendMessageToAndroid('Doorbell pressed')
-    sendMessageToMqtt(doorbell_state_topic, '{"event_type": "press"}', False) 
+    sendMessageToMqtt(doorbell_state_topic, '{"event_type":"pressed"}', False)
+    sendMessageToMqtt(doorbell_sensor_topic, 'Last doorbell ' + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), True)
     logging.log(logging.INFO, 'Doorbell')
+    subprocess.call(['aplay', wave_file_name])
+    time.sleep(5.0)
 
 # main loop
-started()
 alarmtripped = False
 doorbellpressed = False
 numerrors = 0   # Number of errors before a successful send message
@@ -175,9 +196,14 @@ try:
     if haDiscoveryEnable:
         sendMessageToMqtt(alarm_config_topic, json.dumps(alarmConfig), True)
         sendMessageToMqtt(doorbell_config_topic, json.dumps(doorbellConfig), True)
+        sendMessageToMqtt(doorbell_pressed_config_topic, json.dumps(doorbellPressedConfig), True)
+        print(doorbell_pressed_config_topic)
     elif haDiscoveryDisable:
-        sendMessageToMqtt('alarm', '', True)
-        sendMessageToMqtt('doorbell', '', True)
+        sendMessageToMqtt(alarm_config_topic, '', True)
+        sendMessageToMqtt(doorbell_config_topic, '', True)
+        sendMessageToMqtt(doorbell_pressed_config_topic, '', True)
+        print("Disabled")
+    started()
     while True:
         if raspberry_monitor.is_alarm_on():
             if alarmtripped:
@@ -187,9 +213,8 @@ try:
                     alarm()
                     numerrors = 0
                 except Exception as e:
-                    savedata[key_last_exception] = e
-                    savedata.sync()
-                    print("Error trying to send alarm:"+ e)
+                    logging.log(logging.ERROR, "Error trying to send to alarm: "+str(e))
+                    print("Error trying to send alarm:"+ str(e))
                     numerrors = numerrors + 1
                     if numerrors > max_errors:
                         break
@@ -200,8 +225,8 @@ try:
                     alarm_reset()
                     numerrors = 0
                 except Exception as e:
-                    savedata[key_last_exception] = e
-                    print ("Error trying to reset alarm:"+e)
+                    logging.log(logging.ERROR, "Error trying to reset alarm: "+str(e))
+                    print ("Error trying to reset alarm:"+str(e))
                     numerrors = numerrors + 1
                     if numerrors > max_errors:
                         break
@@ -211,8 +236,8 @@ try:
                 try:
                     doorbell()
                 except Exception as e:
-                    savedata[key_last_exception] = e
-                    print("Error trying to ring doorbell:"+e)
+                    logging.log(logging.ERROR, "Error trying to ring doorbell: "+str(e))
+                    print("Error trying to ring doorbell:"+str(e))
                     numerrors = numerrors + 1
                     if numerrors > max_errors:
                         break
