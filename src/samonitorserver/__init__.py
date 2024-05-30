@@ -7,7 +7,7 @@ Parameters: Pushover app token (required), Pushover user key (required), MQTT br
             MQTT broker password (required), HomeAssistant Discovery (optional True or False)
 '''
 
-import time, sys, urllib, http.client, logging, socket, json, uuid, subprocess
+import time, sys, urllib, http.client, logging, socket, json, uuid, pygame, subprocess
 from datetime import datetime
 from raspberrysupport import raspberrymonitor
 from paho.mqtt import client as mqtt_client
@@ -17,7 +17,6 @@ class RelayServerException(Exception): pass
 log_file_name = '/var/log/samonitor/samonitor.log'
 wave_file_name = '/etc/samonitor/doorbell.wav'
 
-# log_file_name = 'samonitor.log'
 wait_time_for_alarm_reset = 10.0
 alarm_poll_wait_time = 0.3 
 max_errors = 100
@@ -80,6 +79,8 @@ logging.basicConfig(filename=log_file_name,level=logging.INFO,format='%(asctime)
 # DEBUG DEBUG
 
 raspberry_monitor = raspberrymonitor.RaspberryMonitor()
+pygame.mixer.init(buffer=2048)
+pygame.mixer.music.load(wave_file_name)
 
 pushover_app_token = sys.argv[1]
 pushover_user_key = sys.argv[2]
@@ -135,8 +136,8 @@ def on_disconnect(client, userdata, rc, properties=None):
         reconnect_count += 1
     logging.log(logging.ERROR, "Reconnect failed after %s attempts. Exiting...")
 
-client = connect_mqtt()
-client.on_disconnect = on_disconnect
+# client = connect_mqtt()
+# client.on_disconnect = on_disconnect
     
 def sendMessageToAndroid(msg):
     # Sends a message to Andorid device
@@ -153,10 +154,11 @@ def sendMessageToAndroid(msg):
         logging.log(logging.ERROR, response.reason)
 
 def sendMessageToMqtt(topic, msg, retain: False):
-    result = client.publish(topic, msg, retain)
-    status = result[0]
-    if status != 0:
-        logging.log(logging.ERROR, 'Failed to send message to MQTT')
+    pass
+#    result = client.publish(topic, msg, retain)
+#    status = result[0]
+#    if status != 0:
+#        logging.log(logging.ERROR, 'Failed to send message to MQTT')
 
 def alarm():
     # Alarm has been tripped
@@ -180,12 +182,13 @@ def started():
     logging.log(logging.INFO, 'Starting SA Monitor')
     
 def doorbell():
-    sendMessageToAndroid('Doorbell pressed')
+    sendMessageToAndroid('Doorbell')
+    pygame.mixer.music.play()
+#    subprocess.call(['aplay', wave_file_name])
+    time.sleep(3)
     sendMessageToMqtt(doorbell_state_topic, '{"event_type":"pressed"}', False)
     sendMessageToMqtt(doorbell_sensor_topic, 'Last doorbell ' + datetime.now().strftime("%m/%d/%Y, %H:%M:%S"), True)
     logging.log(logging.INFO, 'Doorbell')
-    subprocess.call(['aplay', wave_file_name])
-    time.sleep(5.0)
 
 # main loop
 alarmtripped = False
