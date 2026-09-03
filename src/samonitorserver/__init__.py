@@ -6,7 +6,7 @@ Google GCM.
 Parameters: Pushover app token (required), Pushover user key (required)
 '''
 
-import time, sys, urllib, httplib, logging
+import time, sys, urllib, httplib, logging, requests
 from datetime import datetime
 from raspberrysupport import raspberrymonitor
 
@@ -23,6 +23,7 @@ raspberry_monitor = raspberrymonitor.RaspberryMonitor()
 
 pushover_app_token = sys.argv[1]
 pushover_user_key = sys.argv[2]
+home_assistant_url = sys.argv[3] if len(sys.argv) > 2 else ""
 
 def sendMessageToAndroid(msg):
     # Sends a message to Andorid device
@@ -38,23 +39,39 @@ def sendMessageToAndroid(msg):
         logging.log(logging.ERROR, "Error returned from Pushover")
         logging.log(logging.ERROR, response.reason)
 
+def sendMessageToHomeAssistant(source):
+    # sends a JSON message to home assistant
+    if not home_assistant_url:
+        return
+    payload = {
+        "source" : source
+    }
+    response = requests.post(home_assistant_url, json=payload, timeout=5)
+    if response.status_code != 200:
+        logging.log(logging.ERROR, "Error sending message to Home Assistant")
+        logging.log(logging.ERROR, response.reason)
+
 def alarm():
     # Alarm has been tripped
     sendMessageToAndroid('Home Alarm Tripped')
+    sendMessageToHomeAssistant('alarm_tripped')
     logging.log(logging.INFO, 'Alarm tripped message sent')
     
 def alarm_reset():
     # Alarm has been tripped
     sendMessageToAndroid('Alarm reset')
+    sendMessageToHomeAssistant('alarm_reset')
     logging.log(logging.INFO, 'Alarm reset message sent')
     
 def started():
     # Monitor has been (re)started
     sendMessageToAndroid('SA Monitor Started')
+    sendMessageToHomeAssistant('started')
     logging.log(logging.INFO, 'Starting SA Monitor')
     
 def doorbell():
     sendMessageToAndroid('Doorbell')
+    sendMessageToHomeAssistant('doorbell')
     raspberry_monitor.playwave(wave_file_name)
     logging.log(logging.INFO, 'Doorbell')
 
