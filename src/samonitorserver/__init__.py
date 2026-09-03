@@ -46,9 +46,11 @@ def sendMessageToHomeAssistant(source):
     payload_dict = {"source" : source}
     payload = json.dumps(payload_dict)
     try:
-        hostname = home_assistant_url.split('://')[-1]
+        url = urllib.urlparse(home_assistant_url).geturl()
+        hostname = urllib.urlparse(home_assistant_url).netloc.split(':')[0]
+        path = urllib.urlparse(home_assistant_url).path
         conn = httplib.HTTPConnection(hostname)
-        conn.request("POST", "", payload, { "Content-type": "application/json" })
+        conn.request("POST", path, payload, { "Content-type": "application/json" })
         response = conn.getresponse()
         if response.status_code != 200:
             logging.error("Error sending message to Home Assistant. Status: " + str(response.status))
