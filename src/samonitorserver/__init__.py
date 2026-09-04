@@ -63,6 +63,7 @@ def sendMessageToHomeAssistant(source):
         # Extract hostname from hostname:port string
         hostname = hostname_port_str.split(':')[0]
         conn = httplib.HTTPConnection(hostname)
+        path = "/" + path
         conn.request("POST", path, payload, { "Content-type": "application/json" })
         response = conn.getresponse()
         if response.status != 200:
