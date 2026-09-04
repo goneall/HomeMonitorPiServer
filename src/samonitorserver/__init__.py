@@ -65,7 +65,7 @@ def sendMessageToHomeAssistant(source):
         conn = httplib.HTTPConnection(hostname)
         conn.request("POST", path, payload, { "Content-type": "application/json" })
         response = conn.getresponse()
-        if response.status_code != 200:
+        if response.status != 200:
             logging.error("Error sending message to Home Assistant. Status: " + str(response.status))
             body = response.read()
             logging.error("Response body: " + body)
