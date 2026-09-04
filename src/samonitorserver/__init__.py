@@ -46,9 +46,22 @@ def sendMessageToHomeAssistant(source):
     payload_dict = {"source" : source}
     payload = json.dumps(payload_dict)
     try:
-        url = urllib.urlparse(home_assistant_url).geturl()
-        hostname = urllib.urlparse(home_assistant_url).netloc.split(':')[0]
-        path = urllib.urlparse(home_assistant_url).path
+        # Clean up the URL (remove scheme if present, e.g., "http://")
+        if "://" in home_assistant_url:
+            # Strip the scheme part: "http://" or "https://"
+            url_content = home_assistant_url.split("://", 1)[1]
+        else:
+            url_content = home_assistant_url
+
+        # Split into hostname/port and the rest (path)
+        if '/' in url_content:
+            hostname_port_str, path = url_content.split('/', 1)
+        else:
+            hostname_port_str = url_content
+            path = "" # No path if no slashes are found
+
+        # Extract hostname from hostname:port string
+        hostname = hostname_port_str.split(':')[0]
         conn = httplib.HTTPConnection(hostname)
         conn.request("POST", path, payload, { "Content-type": "application/json" })
         response = conn.getresponse()
